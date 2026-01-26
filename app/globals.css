@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Editor specific styles */
+.editable-element {
+  outline: 2px dashed transparent;
+  transition: outline 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.editable-element:hover {
+  outline: 2px dashed #3b82f6;
+  outline-offset: 2px;
+}
+
+.editable-element.selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.element-label {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  background: #3b82f6;
+  color: white;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
