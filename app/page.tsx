@@ -55,10 +55,6 @@ export default function Home() {
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
                   Shopify (Products, Orders, Customers)
                 </li>
-                <li className="flex items-center text-gray-700">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  LinkedIn Ads (Campaigns, Analytics)
-                </li>
               </ul>
               <button
                 onClick={() => router.push('/integrations')}

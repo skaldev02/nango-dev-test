@@ -49,7 +49,7 @@ async function checkIntegrations() {
 
   // Test each integration we're trying to use
   console.log('\n🧪 Testing integration IDs...\n');
-  const integrations = ['hubspot', 'google-ads', 'shopify', 'linkedin-ads'];
+  const integrations = ['hubspot', 'google-ads', 'shopify'];
 
   for (const integrationId of integrations) {
     try {

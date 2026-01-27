@@ -18,10 +18,10 @@ Google Ads connection and data fetching is now fully functional, matching the Hu
 - ✅ **Error Handling**: Graceful handling when certain data is unavailable
 - ✅ **Dynamic Provider Config**: Supports custom integration IDs like `google-ads-9fyg`
 
-**API Endpoints Used:**
+**API Endpoints Used (REST):**
 ```javascript
-- GET /v16/customers:listAccessibleCustomers
-- POST /v16/customers/{customerId}/googleAds:searchStream
+- GET /v20/customers:listAccessibleCustomers
+- POST /v20/customers/{customerId}/googleAds:searchStream
 ```
 
 **Google Ads Query Language (GAQL) queries for:**

@@ -6,7 +6,6 @@ export const INTEGRATIONS = {
   HUBSPOT: 'hubspot',
   GOOGLE_ADS: 'google-ads-9fyg',
   SHOPIFY: 'shopify',
-  LINKEDIN_ADS: 'linkedin-ads',
 } as const;
 
 export type IntegrationType = typeof INTEGRATIONS[keyof typeof INTEGRATIONS];
@@ -44,14 +43,6 @@ export const INTEGRATION_CONFIGS: Integration[] = [
     icon: '🛍️',
     color: 'green',
     features: ['Products', 'Orders', 'Customers', 'Inventory'],
-  },
-  {
-    id: INTEGRATIONS.LINKEDIN_ADS,
-    name: 'LinkedIn Ads',
-    description: 'Professional advertising and campaign management',
-    icon: '💼',
-    color: 'indigo',
-    features: ['Campaigns', 'Ad Analytics', 'Audience Insights', 'Performance'],
   },
 ];
 

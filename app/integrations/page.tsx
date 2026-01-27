@@ -125,6 +125,11 @@ export default function IntegrationsPage() {
   const handleFetchData = async (integrationId: IntegrationType) => {
     setDataLoading(prev => ({ ...prev, [integrationId]: true }));
     
+    console.log('\n========== CLIENT: FETCH DATA ==========');
+    console.log('[Client] Integration ID:', integrationId);
+    console.log('[Client] User ID:', userId);
+    console.log('========================================\n');
+    
     try {
       const response = await fetch('/api/integrations/fetch-data', {
         method: 'POST',
@@ -133,6 +138,9 @@ export default function IntegrationsPage() {
       });
       
       const result = await response.json();
+      
+      console.log('[Client] Response status:', response.status);
+      console.log('[Client] Response data:', result);
       
       if (result.success) {
         setData(prev => {
@@ -504,7 +512,7 @@ export default function IntegrationsPage() {
                       )}
 
                       {/* Google Ads Data Details */}
-                      {integration.id === 'google-ads' && (
+                      {(integration.id === 'google-ads-9fyg' || integration.id.startsWith('google-ads')) && (
                         <div className="space-y-3">
                           {/* Campaigns */}
                           {integrationData.campaigns && integrationData.campaigns.length > 0 && (
@@ -667,7 +675,7 @@ export default function IntegrationsPage() {
               <h4 className="font-semibold mb-2">1. Configure Nango.dev</h4>
               <ul className="list-disc list-inside space-y-1 ml-4 text-sm">
                 <li>Sign up at <a href="https://nango.dev" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">nango.dev</a></li>
-                <li>Create integrations for HubSpot, Google Ads, Shopify, and LinkedIn Ads</li>
+                <li>Create integrations for HubSpot, Google Ads, and Shopify</li>
                 <li>Copy your public and secret keys</li>
               </ul>
             </div>

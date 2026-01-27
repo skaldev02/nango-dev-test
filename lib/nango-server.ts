@@ -19,11 +19,14 @@ export const checkConnectionStatus = async (
   userId: string
 ): Promise<ConnectionStatus> => {
   try {
-    console.log(`[CHECK-CONNECTION] Checking connection for integration: ${integrationId}, userId: ${userId}`);
+    console.log('\n========== CONNECTION CHECK ==========');
+    console.log(`[CHECK-CONNECTION] Integration: ${integrationId}`);
+    console.log(`[CHECK-CONNECTION] User ID: ${userId}`);
+    console.log('======================================\n');
     
     const secretKey = process.env.NANGO_SECRET_KEY;
     if (!secretKey) {
-      console.error('[CHECK-CONNECTION] No NANGO_SECRET_KEY found');
+      console.error('[CHECK-CONNECTION] ❌ No NANGO_SECRET_KEY found');
       return { connected: false };
     }
     
@@ -65,22 +68,27 @@ export const checkConnectionStatus = async (
       (conn: any) => conn.provider_config_key === integrationId
     );
     
-    console.log(`[CHECK-CONNECTION] Total connections:`, allConnections.length);
-    console.log(`[CHECK-CONNECTION] Connections for ${integrationId}:`, connectionsList.length);
+    console.log(`[CHECK-CONNECTION] Total connections in Nango: ${allConnections.length}`);
+    console.log(`[CHECK-CONNECTION] Connections matching provider_config_key='${integrationId}': ${connectionsList.length}`);
     
     if (connectionsList.length > 0) {
-      console.log(`[CHECK-CONNECTION] First connection structure:`, JSON.stringify(connectionsList[0], null, 2));
-      console.log(`[CHECK-CONNECTION] Looking for userId:`, userId);
+      console.log(`[CHECK-CONNECTION] First matching connection:`, JSON.stringify(connectionsList[0], null, 2));
+      console.log(`[CHECK-CONNECTION] Looking for end_user.id='${userId}'`);
       
-      // Log all end_user IDs
+      // Log all matching connections' end_user IDs
       connectionsList.forEach((conn: any, idx: number) => {
-        console.log(`[CHECK-CONNECTION] Connection ${idx}:`, {
+        console.log(`[CHECK-CONNECTION] Connection ${idx + 1}/${connectionsList.length}:`, {
           end_user_id: conn.end_user?.id,
           end_user_email: conn.end_user?.email,
-          end_user_display_name: conn.end_user?.display_name,
           connection_id: conn.connection_id,
+          matches: conn.end_user?.id === userId ? '✅ MATCH' : '❌ no match'
         });
       });
+    } else {
+      console.warn(`[CHECK-CONNECTION] ⚠️ No connections found with provider_config_key='${integrationId}'`);
+      console.warn(`[CHECK-CONNECTION] Available provider_config_keys:`);
+      const uniqueKeys = [...new Set(allConnections.map((c: any) => c.provider_config_key))];
+      uniqueKeys.forEach(key => console.warn(`  - ${key}`));
     }
     
     // Find connection for this specific user

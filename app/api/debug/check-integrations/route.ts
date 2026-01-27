@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   };
 
   // Test each integration we're trying to use
-  const integrations = ['hubspot', 'google-ads', 'shopify', 'linkedin-ads', 'linkedin', 'linkedin-advertising'];
+  const integrations = ['hubspot', 'google-ads', 'shopify'];
 
   for (const integrationId of integrations) {
     try {

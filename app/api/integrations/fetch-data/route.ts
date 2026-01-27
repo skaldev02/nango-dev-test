@@ -6,6 +6,12 @@ export async function POST(request: NextRequest) {
   try {
     const { integrationId, userId } = await request.json();
 
+    console.log('\n========== FETCH DATA REQUEST ==========');
+    console.log('[FETCH-DATA] Request received');
+    console.log('[FETCH-DATA] Integration ID:', integrationId);
+    console.log('[FETCH-DATA] User ID:', userId);
+    console.log('=========================================\n');
+
     if (!integrationId || !userId) {
       return NextResponse.json(
         { error: 'Missing required parameters: integrationId and userId' },
@@ -14,14 +20,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the actual connection ID for this user
+    console.log('[FETCH-DATA] Looking up connection...');
     const connectionId = await getConnectionIdForUser(integrationId, userId);
     
     if (!connectionId) {
+      console.error('[FETCH-DATA] ❌ No connection found!');
+      console.error('[FETCH-DATA] Searched for integrationId:', integrationId);
+      console.error('[FETCH-DATA] Searched for userId:', userId);
       return NextResponse.json(
         { error: 'No connection found for this user. Please connect first.' },
         { status: 404 }
       );
     }
+
+    console.log('[FETCH-DATA] ✅ Connection found!');
+    console.log('[FETCH-DATA] Connection ID:', connectionId);
 
     let data: any = {};
 
@@ -38,16 +51,14 @@ export async function POST(request: NextRequest) {
       integrationType = 'google-ads';
     } else if (integrationId === 'shopify' || integrationId.startsWith('shopify-')) {
       integrationType = 'shopify';
-    } else if (integrationId === 'linkedin-ads' || integrationId.startsWith('linkedin-ads-')) {
-      integrationType = 'linkedin-ads';
     } else {
       console.error('[FETCH-DATA] Unknown integration:', integrationId);
-      console.error('[FETCH-DATA] Available integrations: hubspot, google-ads, shopify, linkedin-ads');
+      console.error('[FETCH-DATA] Available integrations: hubspot, google-ads, shopify');
       return NextResponse.json(
         { 
           error: 'Unknown integration',
           details: `Integration "${integrationId}" is not supported`,
-          supportedIntegrations: ['hubspot', 'google-ads', 'shopify', 'linkedin-ads']
+          supportedIntegrations: ['hubspot', 'google-ads', 'shopify']
         },
         { status: 400 }
       );
@@ -64,9 +75,6 @@ export async function POST(request: NextRequest) {
         break;
       case 'shopify':
         data = await fetchShopifyData(connectionId);
-        break;
-      case 'linkedin-ads':
-        data = await fetchLinkedInAdsData(connectionId);
         break;
     }
 
@@ -182,17 +190,63 @@ async function fetchHubSpotData(connectionId: string) {
 
 async function fetchGoogleAdsData(connectionId: string, providerConfigKey: string) {
   try {
+    console.log('\n========== GOOGLE ADS DATA FETCH ==========');
     console.log('[GoogleAds] Fetching data for connection:', connectionId);
     console.log('[GoogleAds] Using provider config key:', providerConfigKey);
+    console.log('==========================================\n');
+
+    // Google Ads API versions are periodically sunset. Keep this configurable so we can
+    // bump versions without touching code (defaults to the current REST reference).
+    const GOOGLE_ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION || 'v20';
+    console.log('[GoogleAds] Using API version:', GOOGLE_ADS_API_VERSION);
+
+    // Check for developer token
+    const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+    if (!developerToken) {
+      throw new Error(
+        'GOOGLE_ADS_DEVELOPER_TOKEN is not set in environment variables. ' +
+        'Please add it to your .env.local file.'
+      );
+    }
+    console.log('[GoogleAds] Developer token found:', developerToken.substring(0, 10) + '...');
+
+    // Optional but often required when the authenticated Google account is under a manager (MCC).
+    // If set, pass it through as the Google Ads "login-customer-id" header (digits only; no dashes).
+    const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
+    if (loginCustomerId) {
+      console.log('[GoogleAds] Using login customer id (MCC):', loginCustomerId);
+    }
+
+    const googleAdsHeaders: Record<string, string> = {
+      'developer-token': developerToken,
+      ...(loginCustomerId ? { 'login-customer-id': loginCustomerId } : {}),
+    };
+
+    const proxyGoogleAds = (options: {
+      endpoint: string;
+      method: 'GET' | 'POST';
+      data?: any;
+      params?: Record<string, string>;
+    }) =>
+      nango.proxy({
+        providerConfigKey,
+        connectionId,
+        baseUrlOverride: 'https://googleads.googleapis.com',
+        headers: googleAdsHeaders,
+        ...options,
+      });
 
     // First, get the customer/account ID
     // Google Ads requires a customer ID for most operations
-    const customersResponse = await nango.proxy({
-      providerConfigKey: providerConfigKey,
-      connectionId,
-      endpoint: '/v16/customers:listAccessibleCustomers',
+    console.log('[GoogleAds] Step 1: Fetching accessible customers...');
+    
+    // Use Nango proxy with developer token header and base URL override
+    // Google Ads API requires the developer-token header and base URL
+    const customersResponse = await proxyGoogleAds({
+      endpoint: `/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,
       method: 'GET',
     });
+    console.log('[GoogleAds] Customers API response status:', customersResponse.status);
     console.log('[GoogleAds] Accessible customers response:', JSON.stringify(customersResponse.data, null, 2));
 
     const customerIds = customersResponse.data?.resourceNames || [];
@@ -211,19 +265,14 @@ async function fetchGoogleAdsData(connectionId: string, providerConfigKey: strin
       };
     }
 
-    // Extract the customer ID from the first resource name
+    // Extract numeric customer IDs from resource names.
     // Format: "customers/1234567890"
-    const customerId = customerIds[0].split('/')[1];
-    console.log('[GoogleAds] Using customer ID:', customerId);
+    const candidateCustomerIds = customerIds
+      .map((r: string) => r?.split('/')?.[1])
+      .filter(Boolean);
+    console.log('[GoogleAds] Candidate customer IDs:', candidateCustomerIds);
 
-    // Fetch campaigns with metrics using Google Ads Query Language (GAQL)
-    const campaignsResponse = await nango.proxy({
-      providerConfigKey: providerConfigKey,
-      connectionId,
-      endpoint: `/v16/customers/${customerId}/googleAds:searchStream`,
-      method: 'POST',
-      data: {
-        query: `
+    const campaignsQuery = `
           SELECT 
             campaign.id,
             campaign.name,
@@ -238,9 +287,40 @@ async function fetchGoogleAdsData(connectionId: string, providerConfigKey: strin
           WHERE segments.date DURING LAST_30_DAYS
           ORDER BY metrics.impressions DESC
           LIMIT 20
-        `.trim()
+        `.trim();
+
+    // Try customer IDs until we find one we can query (403s are common with MCC / permissions).
+    let customerId: string | null = null;
+    let campaignsResponse: any = null;
+    for (const candidate of candidateCustomerIds) {
+      try {
+        console.log('[GoogleAds] Trying customer ID:', candidate);
+        campaignsResponse = await proxyGoogleAds({
+          endpoint: `/${GOOGLE_ADS_API_VERSION}/customers/${candidate}/googleAds:searchStream`,
+          method: 'POST',
+          data: { query: campaignsQuery },
+        });
+        customerId = candidate;
+        break;
+      } catch (candidateError: any) {
+        const status = candidateError?.response?.status ?? candidateError?.status;
+        const data = candidateError?.response?.data;
+        console.warn('[GoogleAds] Could not query campaigns for customer ID:', candidate, {
+          status,
+          data,
+        });
       }
-    });
+    }
+
+    if (!customerId || !campaignsResponse) {
+      throw new Error(
+        '403 fetching campaigns for accessible customers. ' +
+          'If your Google Ads account is under a manager (MCC), set GOOGLE_ADS_LOGIN_CUSTOMER_ID in .env.local ' +
+          '(digits only; no dashes), then restart the dev server.'
+      );
+    }
+
+    console.log('[GoogleAds] Using customer ID:', customerId);
     console.log('[GoogleAds] Campaigns response status:', campaignsResponse.status);
 
     // Extract campaigns from the response
@@ -251,10 +331,8 @@ async function fetchGoogleAdsData(connectionId: string, providerConfigKey: strin
     let adGroupsList: any[] = [];
     if (campaignsList.length > 0) {
       try {
-        const adGroupsResponse = await nango.proxy({
-          providerConfigKey: providerConfigKey,
-          connectionId,
-          endpoint: `/v16/customers/${customerId}/googleAds:searchStream`,
+        const adGroupsResponse = await proxyGoogleAds({
+          endpoint: `/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:searchStream`,
           method: 'POST',
           data: {
             query: `
@@ -272,7 +350,7 @@ async function fetchGoogleAdsData(connectionId: string, providerConfigKey: strin
               ORDER BY metrics.impressions DESC
               LIMIT 20
             `.trim()
-          }
+          },
         });
         adGroupsList = adGroupsResponse.data?.results || adGroupsResponse.data || [];
         console.log('[GoogleAds] Ad groups fetched:', adGroupsList.length);
@@ -284,10 +362,8 @@ async function fetchGoogleAdsData(connectionId: string, providerConfigKey: strin
     // Fetch keywords (optional)
     let keywordsList: any[] = [];
     try {
-      const keywordsResponse = await nango.proxy({
-        providerConfigKey: providerConfigKey,
-        connectionId,
-        endpoint: `/v16/customers/${customerId}/googleAds:searchStream`,
+      const keywordsResponse = await proxyGoogleAds({
+        endpoint: `/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:searchStream`,
         method: 'POST',
         data: {
           query: `
@@ -306,7 +382,7 @@ async function fetchGoogleAdsData(connectionId: string, providerConfigKey: strin
             ORDER BY metrics.impressions DESC
             LIMIT 20
           `.trim()
-        }
+        },
       });
       keywordsList = keywordsResponse.data?.results || keywordsResponse.data || [];
       console.log('[GoogleAds] Keywords fetched:', keywordsList.length);
@@ -331,13 +407,34 @@ async function fetchGoogleAdsData(connectionId: string, providerConfigKey: strin
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
+    console.error('\n========== GOOGLE ADS ERROR ==========');
     console.error('[GoogleAds] Fetch error:', error);
-    if (error instanceof Error) {
-      console.error('[GoogleAds] Error details:', {
-        message: error.message,
-        stack: error.stack
-      });
+
+    const maybeAny = error as any;
+    const status = maybeAny?.response?.status ?? maybeAny?.status;
+    const responseData = maybeAny?.response?.data;
+    if (status) {
+      console.error('[GoogleAds] HTTP status:', status);
     }
+    if (responseData) {
+      console.error('[GoogleAds] Error response data:', responseData);
+    }
+
+    if (status === 403) {
+      console.error(
+        "[GoogleAds] 403 usually means permissions / MCC / developer token status. " +
+          "Try setting GOOGLE_ADS_LOGIN_CUSTOMER_ID (manager account id, no dashes) and re-authing."
+      );
+    }
+
+    if (error instanceof Error) {
+      console.error('[GoogleAds] Error name:', error.name);
+      console.error('[GoogleAds] Error message:', error.message);
+      console.error('[GoogleAds] Error stack:', error.stack);
+    }
+    // Log the full error object
+    console.error('[GoogleAds] Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error('======================================\n');
     throw error;
   }
 }
@@ -381,27 +478,6 @@ async function fetchShopifyData(connectionId: string) {
     };
   } catch (error) {
     console.error('Shopify fetch error:', error);
-    throw error;
-  }
-}
-
-async function fetchLinkedInAdsData(connectionId: string) {
-  try {
-    // Fetch ad campaigns
-    const campaigns = await nango.proxy({
-      providerConfigKey: 'linkedin-ads',
-      connectionId,
-      endpoint: '/rest/adAccounts',
-      method: 'GET',
-      params: { count: '10' }
-    });
-
-    return {
-      campaigns: campaigns.data?.elements || [],
-      totalCampaigns: campaigns.data?.elements?.length || 0,
-    };
-  } catch (error) {
-    console.error('LinkedIn Ads fetch error:', error);
     throw error;
   }
 }
