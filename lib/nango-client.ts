@@ -125,7 +125,10 @@ export const authenticateIntegration = async (
         // Try to check connection status even while popup is open
         // This helps detect successful auth faster and enables auto-close
         try {
+          console.log('[Nango] Polling connection check...');
           const connected = await checkConnection(integrationId, userId);
+          console.log('[Nango] Connection check result:', connected);
+          
           if (connected && !hasResolved) {
             
             // Mark success detected for the first time
@@ -136,6 +139,8 @@ export const authenticateIntegration = async (
             
             // Auto-close popup after 2 seconds (let user see success message briefly)
             const timeSinceSuccess = Date.now() - successDetectedAt;
+            console.log('[Nango] Time since success:', timeSinceSuccess, 'ms');
+            
             if (timeSinceSuccess >= 2000) {
               hasResolved = true;
               clearInterval(checkInterval);

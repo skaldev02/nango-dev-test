@@ -150,11 +150,44 @@ export default function IntegrationsPage() {
           return newData;
         });
       } else {
-        alert(`Failed to fetch data: ${result.error}`);
+        // Show more helpful error message
+        let errorMessage = result.error || 'Failed to fetch data';
+        
+        // Check if it's a network/connection error
+        if (result.details?.includes('fetch failed') || 
+            result.details?.includes('timeout') ||
+            result.details?.includes('ECONNREFUSED') ||
+            result.details?.includes('ETIMEDOUT')) {
+          errorMessage = 
+            `Network error: Cannot reach Nango API\n\n` +
+            `Possible causes:\n` +
+            `• No internet connection\n` +
+            `• Firewall blocking api.nango.dev\n` +
+            `• VPN/proxy issues\n` +
+            `• Nango API is down\n\n` +
+            `Try:\n` +
+            `1. Check your internet connection\n` +
+            `2. Disable VPN/proxy temporarily\n` +
+            `3. Check if api.nango.dev is accessible`;
+        } else if (result.error?.includes('No connection found')) {
+          errorMessage = 
+            `Connection not found in Nango.\n\n` +
+            `The UI shows "Connected" from cache, but Nango API\n` +
+            `doesn't have this connection.\n\n` +
+            `Please disconnect and reconnect.`;
+        }
+        
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Data fetch error:', error);
-      alert('Failed to fetch data. Please try again.');
+      alert(
+        'Network error: Cannot connect to server.\n\n' +
+        'Please check:\n' +
+        '• Internet connection\n' +
+        '• Development server is running\n' +
+        '• No firewall blocking requests'
+      );
     } finally {
       setDataLoading(prev => ({ ...prev, [integrationId]: false }));
       // Clear the connection loading state as well
@@ -466,6 +499,134 @@ export default function IntegrationsPage() {
                                 ))}
                               </div>
                             </details>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Google Ads Data Details */}
+                      {integration.id === 'google-ads' && (
+                        <div className="space-y-3">
+                          {/* Campaigns */}
+                          {integrationData.campaigns && integrationData.campaigns.length > 0 && (
+                            <details className="bg-white rounded border border-gray-200">
+                              <summary className="cursor-pointer p-3 font-semibold text-gray-900 hover:bg-gray-50">
+                                📊 Campaigns ({integrationData.campaigns.length})
+                              </summary>
+                              <div className="p-3 pt-0 space-y-2 max-h-60 overflow-y-auto">
+                                {integrationData.campaigns.map((campaign: any, idx: number) => (
+                                  <div key={idx} className="p-2 bg-gray-50 rounded text-xs">
+                                    <div className="font-semibold text-gray-900">
+                                      {campaign.campaign?.name || 'Unnamed Campaign'}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-1">
+                                      {campaign.metrics?.impressions !== undefined && (
+                                        <div className="text-gray-600">
+                                          👁️ Impressions: {campaign.metrics.impressions.toLocaleString()}
+                                        </div>
+                                      )}
+                                      {campaign.metrics?.clicks !== undefined && (
+                                        <div className="text-blue-600 font-medium">
+                                          🖱️ Clicks: {campaign.metrics.clicks.toLocaleString()}
+                                        </div>
+                                      )}
+                                      {campaign.metrics?.cost_micros !== undefined && (
+                                        <div className="text-green-600 font-medium">
+                                          💰 Cost: ${(campaign.metrics.cost_micros / 1000000).toFixed(2)}
+                                        </div>
+                                      )}
+                                      {campaign.metrics?.ctr !== undefined && (
+                                        <div className="text-purple-600">
+                                          📈 CTR: {(campaign.metrics.ctr * 100).toFixed(2)}%
+                                        </div>
+                                      )}
+                                    </div>
+                                    {campaign.campaign?.status && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Status: {campaign.campaign.status}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+
+                          {/* Ad Groups */}
+                          {integrationData.adGroups && integrationData.adGroups.length > 0 && (
+                            <details className="bg-white rounded border border-gray-200">
+                              <summary className="cursor-pointer p-3 font-semibold text-gray-900 hover:bg-gray-50">
+                                🎯 Ad Groups ({integrationData.adGroups.length})
+                              </summary>
+                              <div className="p-3 pt-0 space-y-2 max-h-60 overflow-y-auto">
+                                {integrationData.adGroups.map((adGroup: any, idx: number) => (
+                                  <div key={idx} className="p-2 bg-gray-50 rounded text-xs">
+                                    <div className="font-semibold text-gray-900">
+                                      {adGroup.adGroup?.name || adGroup.ad_group?.name || 'Unnamed Ad Group'}
+                                    </div>
+                                    {adGroup.campaign?.name && (
+                                      <div className="text-gray-500 text-xs">
+                                        Campaign: {adGroup.campaign.name}
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-2 mt-1">
+                                      {adGroup.metrics?.impressions !== undefined && (
+                                        <div className="text-gray-600">
+                                          Impressions: {adGroup.metrics.impressions.toLocaleString()}
+                                        </div>
+                                      )}
+                                      {adGroup.metrics?.clicks !== undefined && (
+                                        <div className="text-blue-600">
+                                          Clicks: {adGroup.metrics.clicks.toLocaleString()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+
+                          {/* Keywords */}
+                          {integrationData.keywords && integrationData.keywords.length > 0 && (
+                            <details className="bg-white rounded border border-gray-200">
+                              <summary className="cursor-pointer p-3 font-semibold text-gray-900 hover:bg-gray-50">
+                                🔑 Keywords ({integrationData.keywords.length})
+                              </summary>
+                              <div className="p-3 pt-0 space-y-2 max-h-60 overflow-y-auto">
+                                {integrationData.keywords.map((keyword: any, idx: number) => (
+                                  <div key={idx} className="p-2 bg-gray-50 rounded text-xs">
+                                    <div className="font-semibold text-gray-900">
+                                      {keyword.adGroupCriterion?.keyword?.text || keyword.ad_group_criterion?.keyword?.text || 'Keyword'}
+                                    </div>
+                                    {keyword.adGroupCriterion?.keyword?.match_type && (
+                                      <div className="text-xs text-gray-500">
+                                        Match: {keyword.adGroupCriterion.keyword.match_type}
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-2 mt-1">
+                                      {keyword.metrics?.impressions !== undefined && (
+                                        <div className="text-gray-600">
+                                          Impressions: {keyword.metrics.impressions.toLocaleString()}
+                                        </div>
+                                      )}
+                                      {keyword.metrics?.clicks !== undefined && (
+                                        <div className="text-blue-600">
+                                          Clicks: {keyword.metrics.clicks.toLocaleString()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+
+                          {/* Account Info */}
+                          {integrationData.customerId && (
+                            <div className="bg-white rounded border border-gray-200 p-3 text-xs">
+                              <span className="text-gray-600">Customer ID: </span>
+                              <span className="font-mono text-gray-900">{integrationData.customerId}</span>
+                            </div>
                           )}
                         </div>
                       )}

@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[CONNECT] Calling Nango API...');
+    console.log('[CONNECT] Creating session for end_user.id:', userId);
     
     // Create a Connect session using Nango's REST API
     const response = await fetch('https://api.nango.dev/connect/sessions', {
